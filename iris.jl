@@ -33,11 +33,19 @@ train_data = DataLoader((Xtrain, Ytrain, ytrain), batchsize=args.batchsize)
 test_data = DataLoader((Xtest, Ytest, ytest), batchsize=args.batchsize)
 
 # Simple MLP
-mlp_sizes = [size(X,1), 5, length(unique(y))]
-model = Chain(
-  Dense(mlp_sizes[1], mlp_sizes[2], relu),
-  Dense(mlp_sizes[2], mlp_sizes[end])
-)
+struct MLP
+  sizes::Array{Integer,1}
+  model::Chain
+
+  MLP(sizes) = new(sizes, Chain(
+    Dense(sizes[1], sizes[2], relu),
+    Dense(sizes[2], sizes[end])
+  ))
+end
+mlp = MLP([size(X,1), 5, length(unique(y))])
+
+# Metrics
+loss(X,Y,y) = logitcrossentropy(mlp.model(X), Y)
 
 function loss_all(dataloader, model)
   out = 0.0
@@ -55,16 +63,16 @@ function accuracy(data_loader, model)
   return acc/length(data_loader)
 end
 
-loss(X,Y,y) = logitcrossentropy(model(X), Y)
+# Training loop
 opt = ADAM(args.η)
-evalcb = () -> @show(loss_all(train_data, model))
+evalcb = () -> @show(loss_all(train_data, mlp.model))
 function step()
-  Flux.train!(loss, params(model), train_data, opt)
+  Flux.train!(loss, params(mlp.model), train_data, opt)
   evalcb()
 end
 @epochs args.epochs step()
 
 println("")
-@show accuracy(train_data, model)
-@show accuracy(test_data, model)
+@show accuracy(train_data, mlp.model)
+@show accuracy(test_data, mlp.model)
 ;
